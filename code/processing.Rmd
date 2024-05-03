@@ -1,0 +1,85 @@
+#### Install dependencies:
+
+```{r}
+install.packages("RobustLinearReg")
+```
+
+---
+editor_options: 
+  chunk_output_type: console
+---
+
+#### Process files:
+
+```{r}
+library(RobustLinearReg)
+
+csv_files <- list.files(path="preprocessing_data",pattern = ".*.csv$")
+language_data <- read.csv("../data/language_data.csv",sep=";")
+
+for (file in csv_files) {
+  data <- read.csv(paste("preprocessing_data/",file,sep=""))
+  
+  code <- gsub(".csv", "", file)
+  language_name <- language_data[language_data$ISO.code== code,]$Language
+  # length <- data$Length
+  
+  x <- c()
+  for (i in seq_along(data$Frequency)) {
+    x <- c(x, rep(i, data$Frequency[i]))
+  }
+  
+  b <- 1.5
+  
+  binned_x <- c()
+  binned_y <- c()
+  last_index <- 0
+  n <- 0
+  for (i in seq_along(x)) {
+    current_index <- floor(logb(x[i], base=b))
+    if (current_index == last_index) {
+      n <- n+1
+    } else {
+      binned_x <- c(binned_x, sqrt( ( b^last_index ) * ( b^( last_index+1 ) ) ))
+      binned_y <- c(binned_y, n / ( ( b^( last_index+1 ) ) - ( b^last_index ) ))
+      n <- 1
+      last_index <- current_index
+    }
+  }
+  
+  binned_x <- c(binned_x, sqrt( ( b^last_index ) * ( b^( last_index+1 ) ) ))
+  binned_y <- c(binned_y, n / ( ( b^( last_index+1 ) ) - ( b^last_index ) ))
+  
+  binned_x <- log(binned_x)
+  binned_y <- log(binned_y)
+  
+  frequency <- log(data$Frequency)
+  rank <- log(seq_len(nrow(data)))
+  
+  x_min <- min(c(rank, binned_x))
+  x_max <- max(c(rank, binned_x))
+  y_min <- min(c(frequency, binned_y))
+  y_max <- max(c(frequency, binned_y))
+  
+  theilsen_model <- theil_sen_regression(binned_x ~ binned_y)
+  theilsen_model_no_mb <- theil_sen_regression(rank ~ frequency)
+
+  plot(rank, frequency, type = "p", col = "blue", xlab = "Rank", ylab = "Frequency", main = paste(language_name, "frequencies and rank"), xlim = c(x_min, x_max), ylim = c(y_min, y_max), cex=0.75)
+  points(binned_x, binned_y, type = "b", col = "green", cex=0.75)
+  abline(theilsen_model,col='red')
+  abline(theilsen_model_no_mb,col='purple')
+  legend("topright", legend = c("Original", "mb", "Theil-sen", "Theil-sen + mb"), col = c("blue", "green", "purple", "red"), pch = 1)
+
+  
+  cat(paste(code, ":"))
+  cat("\n")
+  cat("  Alpha (without mb):", unname(coef(theilsen_model_no_mb)[2]))
+  cat("\n")
+  cat("  Alpha:", unname(coef(theilsen_model)[2]))
+  cat("\n")
+  # cat("  Frequencies sum:", frequency_sum)
+  # cat("\n")
+  # cat("  Types count:", types_count)
+  # cat("\n\n")
+}
+```
