@@ -17,12 +17,27 @@ library(RobustLinearReg)
 csv_files <- list.files(path="preprocessing_data",pattern = ".*.csv$")
 language_data <- read.csv("../data/language_data.csv",sep=";")
 
+language <- c()
+family <- c()
+tokens <- c()
+types <- c()
+alpha <- c()
+beta <- c()
+beta_p <- c()
+
+charts_data <- data.frame(x = numeric(0), y = numeric(0), Language = character(0))
+chart_languages <- c('eu')
+
 for (file in csv_files) {
   data <- read.csv(paste("preprocessing_data/",file,sep=""))
   
   code <- gsub(".csv", "", file)
-  language_name <- language_data[language_data$ISO.code== code,]$Language
-  # length <- data$Length
+  language_info <- language_data[language_data$ISO.code== code,]
+  
+  language <- c(language, language_info$Language)
+  family <- c(family, language_info$Family)
+  tokens <- c(tokens, sum(data$Frequency))
+  types <- c(types, nrow(data))
   
   x <- c()
   for (i in seq_along(data$Frequency)) {
@@ -34,24 +49,28 @@ for (file in csv_files) {
   binned_x <- c()
   binned_y <- c()
   last_index <- 0
-  n <- 0
+  last_n <- 0
   for (i in seq_along(x)) {
     current_index <- floor(logb(x[i], base=b))
     if (current_index == last_index) {
-      n <- n+1
+      last_n <- last_n+1
     } else {
       binned_x <- c(binned_x, sqrt( ( b^last_index ) * ( b^( last_index+1 ) ) ))
-      binned_y <- c(binned_y, n / ( ( b^( last_index+1 ) ) - ( b^last_index ) ))
-      n <- 1
+      binned_y <- c(binned_y, last_n / ( ( b^( last_index+1 ) ) - ( b^last_index ) ))
+      last_n <- 1
       last_index <- current_index
     }
   }
   
   binned_x <- c(binned_x, sqrt( ( b^last_index ) * ( b^( last_index+1 ) ) ))
-  binned_y <- c(binned_y, n / ( ( b^( last_index+1 ) ) - ( b^last_index ) ))
+  binned_y <- c(binned_y, last_n / ( ( b^( last_index+1 ) ) - ( b^last_index ) ))
   
   binned_x <- log(binned_x)
   binned_y <- log(binned_y)
+  
+  # if (code %in% chart_languages) {
+  #   
+  # }
   
   frequency <- log(data$Frequency)
   rank <- log(seq_len(nrow(data)))
@@ -64,22 +83,159 @@ for (file in csv_files) {
   theilsen_model <- theil_sen_regression(binned_x ~ binned_y)
   theilsen_model_no_mb <- theil_sen_regression(rank ~ frequency)
 
-  plot(rank, frequency, type = "p", col = "blue", xlab = "Rank", ylab = "Frequency", main = paste(language_name, "frequencies and rank"), xlim = c(x_min, x_max), ylim = c(y_min, y_max), cex=0.75)
+  plot(rank, frequency, type = "p", col = "blue", xlab = "Rank", ylab = "Frequency", main = paste(language_info$Language, "frequencies and rank"), xlim = c(x_min, x_max), ylim = c(y_min, y_max), cex=0.75)
   points(binned_x, binned_y, type = "b", col = "green", cex=0.75)
   abline(theilsen_model,col='red')
   abline(theilsen_model_no_mb,col='purple')
   legend("topright", legend = c("Original", "mb", "Theil-sen", "Theil-sen + mb"), col = c("blue", "green", "purple", "red"), pch = 1)
 
+  alpha <- c(alpha, unname(coef(theilsen_model)[2]))
   
-  cat(paste(code, ":"))
-  cat("\n")
-  cat("  Alpha (without mb):", unname(coef(theilsen_model_no_mb)[2]))
-  cat("\n")
-  cat("  Alpha:", unname(coef(theilsen_model)[2]))
-  cat("\n")
-  # cat("  Frequencies sum:", frequency_sum)
-  # cat("\n")
-  # cat("  Types count:", types_count)
-  # cat("\n\n")
+  x <- data$Frequency
+  n <- c()
+  f <- c()
+  
+  last_n <- 0
+  last_f <- data$Frequency[1]
+  for (freq in data$Frequency) {
+    if (freq == last_f) {
+      last_n <- last_n+1
+    } else {
+      n <- c(n, last_n)
+      f <- c(f, last_f)
+      last_n <- 1
+      last_f <- freq
+    }
+  }
+  
+  n <- c(n, last_n)
+  f <- c(f, last_f)
+  n <- log(n)
+  f <- log(f)
+  
+  b <- 1.5
+  
+  binned_x <- c()
+  binned_y <- c()
+  last_index <- floor(logb(x[1], base=b))
+  last_n <- 0
+  for (i in seq_along(x)) {
+    current_index <- floor(logb(x[i], base=b))
+    if (current_index == last_index) {
+      last_n <- last_n+1
+    } else {
+      binned_x <- c(binned_x, sqrt( ( b^last_index ) * ( b^( last_index+1 ) ) ))
+      binned_y <- c(binned_y, last_n / ( ( b^( last_index+1 ) ) - ( b^last_index ) ))
+      last_n <- 1
+      last_index <- current_index
+    }
+  }
+  
+  binned_x <- log(c(binned_x, sqrt( ( b^last_index ) * ( b^( last_index+1 ) ) )))
+  # adding relatively small amount to avoid negative values while remaining significant
+  binned_y <- log(c(binned_y, last_n / ( ( b^( last_index+1 ) ) - ( b^last_index ) ))+1)
+  
+  theilsen_model <- theil_sen_regression(binned_x ~ binned_y)
+  theilsen_model_no_mb <- theil_sen_regression(f ~ n)
+
+  beta <- c(beta, unname(coef(theilsen_model)[2]))
+  
+  x_min <- min(c(f, binned_x))
+  x_max <- max(c(f, binned_x))
+  y_min <- min(c(n, binned_y))
+  y_max <- max(c(n, binned_y))
+  
+  plot(f, n, type = "p", col = "blue", xlab = "Frequency", ylab = "number", main = paste(language_info$Language, "frequencies"), xlim = c(x_min, x_max), ylim = c(y_min, y_max), cex=0.75)
+  points(binned_x, binned_y, type = "b", col = "green", cex=0.75)
+  abline(theilsen_model,col='red')
+  abline(theilsen_model_no_mb,col='purple')
+  legend("topright", legend = c("Original", "mb", "Theil-sen", "Theil-sen + mb"), col = c("blue", "green", "purple", "red"), pch = 1)
+  
+  x <- c()
+  last_freq <- data$Frequency[1]
+  for (i in seq_along(data$Frequency)) {
+    if (last_freq != data$Frequency[i]) {
+      x <- c(x, rep(last_freq, i))
+      last_freq <- data$Frequency[i]
+    }
+  }
+  x <- c(x, rep(last_freq, length(data$Frequency)))
+  
+  n <- c()
+  f <- c()
+  
+  last_n <- 0
+  last_f <- x[1]
+  for (freq in x) {
+    if (freq == last_f) {
+      last_n <- last_n+1
+    } else {
+      n <- c(n, last_n)
+      f <- c(f, last_f)
+      last_n <- 1
+      last_f <- freq
+    }
+  }
+  
+  n <- c(n, last_n)
+  f <- c(f, last_f)
+  n <- log(n)
+  f <- log(f)
+  
+  b <- 1.5
+  
+  binned_x <- c()
+  binned_y <- c()
+  last_index <- floor(logb(x[1], base=b))
+  last_n <- 0
+  for (i in seq_along(x)) {
+    current_index <- floor(logb(x[i], base=b))
+    if (current_index == last_index) {
+      last_n <- last_n+1
+    } else {
+      binned_x <- c(binned_x, sqrt( ( b^last_index ) * ( b^( last_index+1 ) ) ))
+      binned_y <- c(binned_y, last_n / ( ( b^( last_index+1 ) ) - ( b^last_index ) ))
+      last_n <- 1
+      last_index <- current_index
+    }
+  }
+  
+  binned_x <- log(c(binned_x, sqrt( ( b^last_index ) * ( b^( last_index+1 ) ) )))
+  # adding relatively small amount to avoid negative values while remaining significant
+  binned_y <- log(c(binned_y, last_n / ( ( b^( last_index+1 ) ) - ( b^last_index ) ))+1)
+  
+  theilsen_model <- theil_sen_regression(binned_x ~ binned_y)
+  theilsen_model_no_mb <- theil_sen_regression(f ~ n)
+
+  beta_p <- c(beta_p, unname(coef(theilsen_model)[2]))
+  
+  x_min <- min(c(f, binned_x))
+  x_max <- max(c(f, binned_x))
+  y_min <- min(c(n, binned_y))
+  y_max <- max(c(n, binned_y))
+  
+  plot(f, n, type = "p", col = "blue", xlab = "Frequency", ylab = "number", main = paste(language_info$Language, "<= frequencies"), xlim = c(x_min, x_max), ylim = c(y_min, y_max), cex=0.75)
+  points(binned_x, binned_y, type = "b", col = "green", cex=0.75)
+  abline(theilsen_model,col='red')
+  abline(theilsen_model_no_mb,col='purple')
+  legend("topright", legend = c("Original", "mb", "Theil-sen", "Theil-sen + mb"), col = c("blue", "green", "purple", "red"), pch = 1)
+  
+
+
+
+# p <- ggplot(merged_files, aes(x = Length, y = Frequency, label = Token)) +
+#   geom_point() +
+#   geom_text_repel() +
+#   facet_wrap( ~ Language, ncol=3, nrow=3)
 }
+
+cat("Language,Family,Tokens,Types,α,β,β′\n")
+for (i in seq_along(language)) {
+  row <- c(language[i],family[i],tokens[i],types[i],
+           format(alpha[i], scientific = FALSE, digits = 4),
+           format(beta[i], scientific = FALSE, digits = 4),
+           format(beta_p[i], scientific = FALSE, digits = 4))
+  cat(paste(row, collapse = ","),"\n")
+}
+cat("\n")
 ```
