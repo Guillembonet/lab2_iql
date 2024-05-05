@@ -44,7 +44,7 @@ charts_predicted_data2 <- data.frame(x = numeric(0), y = numeric(0), Language = 
 
 charts_data3 <- data.frame(x = numeric(0), y = numeric(0), Token = character(0), Language = character(0))
 charts_predicted_data3 <- data.frame(x = numeric(0), y = numeric(0), Language = character(0))
-chart_languages <- c('eu', 'es', 'ko', 'fi', 'et', 'kn')
+chart_languages <- c('eu', 'es', 'ko', 'id', 'et', 'kn')
 
 for (file in csv_files) {
   data <- read.csv(paste("preprocessing_data/",file,sep=""))
@@ -57,11 +57,13 @@ for (file in csv_files) {
   tokens <- c(tokens, sum(data$Frequency))
   types <- c(types, nrow(data))
   
+  ## Frequency <-> rank calculation
   x <- c()
   for (i in seq_along(data$Frequency)) {
     x <- c(x, rep(i, data$Frequency[i]))
   }
   
+  # Multiplicative binning
   b <- 1.5
   
   binned_x <- c()
@@ -94,18 +96,20 @@ for (file in csv_files) {
   y_min <- min(c(frequency, binned_y))
   y_max <- max(c(frequency, binned_y))
   
+  # Theil-sen method on multiplicative binning data and raw data (all log-log)
   tsmd <- data.frame(x = binned_x, y = binned_y)
   theilsen_model <- theil_sen_regression(x ~ y, data = tsmd)
   theilsen_model_no_mb <- theil_sen_regression(rank ~ frequency)
   
+  # Calculate score
   predicted_x <- predict(theilsen_model, newdata = data.frame(y = frequency))
   predicted_x2 <- predict(theilsen_model_no_mb, newdata = data.frame(y = frequency))
   score1 <- abs(rank[1]-predicted_x[1])^2+abs(rank[length(predicted_x)]-predicted_x[length(predicted_x)])^2
   score2 <- abs(rank[1]-predicted_x2[1])^2+abs(rank[length(predicted_x)]-predicted_x2[length(predicted_x)])^2
-
   scores_mb_ts <- c(scores_mb_ts, sqrt(score1/2))
   scores_mb <- c(scores_mb, sqrt(score2/2))
 
+  # Prepare data for facet chart + show single chart
   if (code %in% chart_languages) {
     for (i in 1:length(frequency)) {
       charts_data <- rbind(charts_data, data.frame(x = rank[i], y = frequency[i], Token = data$Token[i], Language = language_info$Language))
@@ -126,6 +130,7 @@ for (file in csv_files) {
 
   alpha <- c(alpha, unname(coef(theilsen_model)[2]))
   
+  ## n <-> Frequency calculation
   x <- data$Frequency
   n <- c()
   f <- c()
@@ -148,6 +153,7 @@ for (file in csv_files) {
   n <- log(n)
   f <- log(f)
   
+  # Multiplicative binning
   b <- 1.5
   
   binned_x <- c()
@@ -175,12 +181,14 @@ for (file in csv_files) {
   y_min <- min(c(n, binned_y))
   y_max <- max(c(n, binned_y))
   
+  # Theil-sen method on multiplicative binning data and raw data (all log-log)
   tsmd <- data.frame(x = binned_x, y = binned_y)
   theilsen_model <- theil_sen_regression(x ~ y, data = tsmd)
   theilsen_model_no_mb <- theil_sen_regression(f ~ n)
   
   beta <- c(beta, unname(coef(theilsen_model)[2]))
 
+  # Calculate score
   predicted_x <- predict(theilsen_model, newdata = data.frame(y = n))
   predicted_x2 <- predict(theilsen_model_no_mb, newdata = data.frame(y = n))
   score1 <- abs(f[1]-predicted_x[1])^2+abs(f[length(predicted_x)]-predicted_x[length(predicted_x)])^2
@@ -189,6 +197,7 @@ for (file in csv_files) {
   scores_mb_ts2 <- c(scores_mb_ts2, sqrt(score1/2))
   scores_mb2 <- c(scores_mb2, sqrt(score2/2))
   
+  # Prepare data for facet chart + show single chart
   if (code %in% chart_languages) {
     for (i in 1:length(f)) {
       charts_data2 <- rbind(charts_data2, data.frame(x = f[i], y = n[i], Token = data$Token[i], Language = language_info$Language))
@@ -207,6 +216,7 @@ for (file in csv_files) {
     legend("topright", legend = c("Original", "mb", "Theil-sen", "Theil-sen + mb"), col = c("blue", "green", "purple", "red"), pch = 1)
   }
   
+  ## n>= <-> Frequency calculation
   x <- c()
   last_freq <- data$Frequency[1]
   for (i in seq_along(data$Frequency)) {
@@ -238,6 +248,7 @@ for (file in csv_files) {
   n <- log(n)
   f <- log(f)
   
+  # Multiplicative binning
   b <- 1.5
   
   binned_x <- c()
@@ -260,12 +271,14 @@ for (file in csv_files) {
   # adding relatively small amount to avoid negative values while remaining significant
   binned_y <- log(c(binned_y, last_n / ( ( b^( last_index+1 ) ) - ( b^last_index ) ))+1)
   
+  # Theil-sen method on multiplicative binning data and raw data (all log-log)
   tsmd <- data.frame(x = binned_x, y = binned_y)
   theilsen_model <- theil_sen_regression(x ~ y, data = tsmd)
   theilsen_model_no_mb <- theil_sen_regression(f ~ n)
 
   beta_p <- c(beta_p, unname(coef(theilsen_model)[2]))
   
+  # Calculate score
   predicted_x <- predict(theilsen_model, newdata = data.frame(y = n))
   predicted_x2 <- predict(theilsen_model_no_mb, newdata = data.frame(y = n))
   score1 <- abs(f[1]-predicted_x[1])^2+abs(f[length(predicted_x)]-predicted_x[length(predicted_x)])^2
@@ -279,6 +292,7 @@ for (file in csv_files) {
   y_min <- min(c(n, binned_y))
   y_max <- max(c(n, binned_y))
   
+  # Prepare data for facet chart + show single chart
   if (code %in% chart_languages) {
     for (i in 1:length(f)) {
       charts_data3 <- rbind(charts_data3, data.frame(x = f[i], y = n[i], Token = data$Token[i], Language = language_info$Language))
@@ -301,6 +315,7 @@ for (file in csv_files) {
   beta_p_t <- c(beta_p_t, 1/alpha)
 }
 
+# 6 figure plots
 p <- ggplot() +
   geom_point(data = charts_data, aes(x = x, y = y)) +
   geom_line(data = charts_predicted_data, aes(x = x, y = y), color = "gray", linetype = "dashed") +
@@ -322,6 +337,7 @@ p <- ggplot() +
 
 print(p)
 
+# Print tables in csv format
 cat("Language,Family,Tokens,Types,α,β,β′\n")
 for (i in seq_along(language)) {
   row <- c(language[i],family[i],tokens[i],types[i],
@@ -344,6 +360,7 @@ for (i in seq_along(language)) {
 }
 cat("\n\n")
 
+# frequency <-> rank scores
 cat("Language,score mb+ts,score ts\n")
 for (i in seq_along(language)) {
   row <- c(language[i],
@@ -353,6 +370,7 @@ for (i in seq_along(language)) {
 }
 cat("\n\n")
 
+# n <-> frequency scores
 cat("Language,score mb+ts,score ts\n")
 for (i in seq_along(language)) {
   row <- c(language[i],
@@ -362,6 +380,7 @@ for (i in seq_along(language)) {
 }
 cat("\n\n")
 
+# n>= <-> frequency scores
 cat("Language,score mb+ts,score ts\n")
 for (i in seq_along(language)) {
   row <- c(language[i],
