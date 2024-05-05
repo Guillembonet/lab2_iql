@@ -13,6 +13,8 @@ editor_options:
 
 ```{r}
 library(RobustLinearReg)
+library(ggplot2)
+library(ggrepel)
 
 csv_files <- list.files(path="preprocessing_data",pattern = ".*.csv$")
 language_data <- read.csv("../data/language_data.csv",sep=";")
@@ -23,10 +25,26 @@ tokens <- c()
 types <- c()
 alpha <- c()
 beta <- c()
+beta_t <- c()
 beta_p <- c()
+beta_p_t <- c()
 
-charts_data <- data.frame(x = numeric(0), y = numeric(0), Language = character(0))
-chart_languages <- c('eu')
+scores_mb_ts <- c()
+scores_mb <- c()
+scores_mb_ts2 <- c()
+scores_mb2 <- c()
+scores_mb_ts3 <- c()
+scores_mb3 <- c()
+
+charts_data <- data.frame(x = numeric(0), y = numeric(0), Token = character(0), Language = character(0))
+charts_predicted_data <- data.frame(x = numeric(0), y = numeric(0), Language = character(0))
+
+charts_data2 <- data.frame(x = numeric(0), y = numeric(0), Token = character(0), Language = character(0))
+charts_predicted_data2 <- data.frame(x = numeric(0), y = numeric(0), Language = character(0))
+
+charts_data3 <- data.frame(x = numeric(0), y = numeric(0), Token = character(0), Language = character(0))
+charts_predicted_data3 <- data.frame(x = numeric(0), y = numeric(0), Language = character(0))
+chart_languages <- c('eu', 'es', 'ko', 'fi', 'et', 'kn')
 
 for (file in csv_files) {
   data <- read.csv(paste("preprocessing_data/",file,sep=""))
@@ -68,10 +86,6 @@ for (file in csv_files) {
   binned_x <- log(binned_x)
   binned_y <- log(binned_y)
   
-  # if (code %in% chart_languages) {
-  #   
-  # }
-  
   frequency <- log(data$Frequency)
   rank <- log(seq_len(nrow(data)))
   
@@ -80,14 +94,35 @@ for (file in csv_files) {
   y_min <- min(c(frequency, binned_y))
   y_max <- max(c(frequency, binned_y))
   
-  theilsen_model <- theil_sen_regression(binned_x ~ binned_y)
+  tsmd <- data.frame(x = binned_x, y = binned_y)
+  theilsen_model <- theil_sen_regression(x ~ y, data = tsmd)
   theilsen_model_no_mb <- theil_sen_regression(rank ~ frequency)
+  
+  predicted_x <- predict(theilsen_model, newdata = data.frame(y = frequency))
+  predicted_x2 <- predict(theilsen_model_no_mb, newdata = data.frame(y = frequency))
+  score1 <- abs(rank[1]-predicted_x[1])^2+abs(rank[length(predicted_x)]-predicted_x[length(predicted_x)])^2
+  score2 <- abs(rank[1]-predicted_x2[1])^2+abs(rank[length(predicted_x)]-predicted_x2[length(predicted_x)])^2
 
-  plot(rank, frequency, type = "p", col = "blue", xlab = "Rank", ylab = "Frequency", main = paste(language_info$Language, "frequencies and rank"), xlim = c(x_min, x_max), ylim = c(y_min, y_max), cex=0.75)
-  points(binned_x, binned_y, type = "b", col = "green", cex=0.75)
-  abline(theilsen_model,col='red')
-  abline(theilsen_model_no_mb,col='purple')
-  legend("topright", legend = c("Original", "mb", "Theil-sen", "Theil-sen + mb"), col = c("blue", "green", "purple", "red"), pch = 1)
+  scores_mb_ts <- c(scores_mb_ts, sqrt(score1/2))
+  scores_mb <- c(scores_mb, sqrt(score2/2))
+
+  if (code %in% chart_languages) {
+    for (i in 1:length(frequency)) {
+      charts_data <- rbind(charts_data, data.frame(x = rank[i], y = frequency[i], Token = data$Token[i], Language = language_info$Language))
+    }
+    
+    predicted_y <- c(floor(min(frequency)):ceiling(max(frequency)))
+    predicted_x <- predict(theilsen_model, newdata = data.frame(y = predicted_y))
+    for (i in 1:length(predicted_y)) {
+      charts_predicted_data <- rbind(charts_predicted_data, data.frame(x = predicted_x[i], y = predicted_y[i], Language = language_info$Language))
+    }
+    
+    plot(rank, frequency, type = "p", col = "blue", xlab = "Rank", ylab = "Frequency", main = paste(language_info$Language, "frequencies and rank"), xlim = c(x_min, x_max), ylim = c(y_min, y_max), cex=0.75)
+    points(binned_x, binned_y, type = "b", col = "green", cex=0.75)
+    abline(theilsen_model,col='red')
+    abline(theilsen_model_no_mb,col='purple')
+    legend("topright", legend = c("Original", "mb", "Theil-sen", "Theil-sen + mb"), col = c("blue", "green", "purple", "red"), pch = 1)
+  }
 
   alpha <- c(alpha, unname(coef(theilsen_model)[2]))
   
@@ -134,22 +169,43 @@ for (file in csv_files) {
   binned_x <- log(c(binned_x, sqrt( ( b^last_index ) * ( b^( last_index+1 ) ) )))
   # adding relatively small amount to avoid negative values while remaining significant
   binned_y <- log(c(binned_y, last_n / ( ( b^( last_index+1 ) ) - ( b^last_index ) ))+1)
-  
-  theilsen_model <- theil_sen_regression(binned_x ~ binned_y)
-  theilsen_model_no_mb <- theil_sen_regression(f ~ n)
 
-  beta <- c(beta, unname(coef(theilsen_model)[2]))
-  
   x_min <- min(c(f, binned_x))
   x_max <- max(c(f, binned_x))
   y_min <- min(c(n, binned_y))
   y_max <- max(c(n, binned_y))
   
-  plot(f, n, type = "p", col = "blue", xlab = "Frequency", ylab = "number", main = paste(language_info$Language, "frequencies"), xlim = c(x_min, x_max), ylim = c(y_min, y_max), cex=0.75)
-  points(binned_x, binned_y, type = "b", col = "green", cex=0.75)
-  abline(theilsen_model,col='red')
-  abline(theilsen_model_no_mb,col='purple')
-  legend("topright", legend = c("Original", "mb", "Theil-sen", "Theil-sen + mb"), col = c("blue", "green", "purple", "red"), pch = 1)
+  tsmd <- data.frame(x = binned_x, y = binned_y)
+  theilsen_model <- theil_sen_regression(x ~ y, data = tsmd)
+  theilsen_model_no_mb <- theil_sen_regression(f ~ n)
+  
+  beta <- c(beta, unname(coef(theilsen_model)[2]))
+
+  predicted_x <- predict(theilsen_model, newdata = data.frame(y = n))
+  predicted_x2 <- predict(theilsen_model_no_mb, newdata = data.frame(y = n))
+  score1 <- abs(f[1]-predicted_x[1])^2+abs(f[length(predicted_x)]-predicted_x[length(predicted_x)])^2
+  score2 <- abs(f[1]-predicted_x2[1])^2+abs(f[length(predicted_x)]-predicted_x2[length(predicted_x)])^2
+
+  scores_mb_ts2 <- c(scores_mb_ts2, sqrt(score1/2))
+  scores_mb2 <- c(scores_mb2, sqrt(score2/2))
+  
+  if (code %in% chart_languages) {
+    for (i in 1:length(f)) {
+      charts_data2 <- rbind(charts_data2, data.frame(x = f[i], y = n[i], Token = data$Token[i], Language = language_info$Language))
+    }
+    
+    predicted_y <- c(floor(min(n)):ceiling(max(n)))
+    predicted_x <- predict(theilsen_model, newdata = data.frame(y = predicted_y))
+    for (i in 1:length(predicted_y)) {
+      charts_predicted_data2 <- rbind(charts_predicted_data2, data.frame(x = predicted_x[i], y = predicted_y[i], Language = language_info$Language))
+    }
+  
+    plot(f, n, type = "p", col = "blue", xlab = "Frequency", ylab = "number", main = paste(language_info$Language, "frequencies"), xlim = c(x_min, x_max), ylim = c(y_min, y_max), cex=0.75)
+    points(binned_x, binned_y, type = "b", col = "green", cex=0.75)
+    abline(theilsen_model,col='red')
+    abline(theilsen_model_no_mb,col='purple')
+    legend("topright", legend = c("Original", "mb", "Theil-sen", "Theil-sen + mb"), col = c("blue", "green", "purple", "red"), pch = 1)
+  }
   
   x <- c()
   last_freq <- data$Frequency[1]
@@ -204,30 +260,67 @@ for (file in csv_files) {
   # adding relatively small amount to avoid negative values while remaining significant
   binned_y <- log(c(binned_y, last_n / ( ( b^( last_index+1 ) ) - ( b^last_index ) ))+1)
   
-  theilsen_model <- theil_sen_regression(binned_x ~ binned_y)
+  tsmd <- data.frame(x = binned_x, y = binned_y)
+  theilsen_model <- theil_sen_regression(x ~ y, data = tsmd)
   theilsen_model_no_mb <- theil_sen_regression(f ~ n)
 
   beta_p <- c(beta_p, unname(coef(theilsen_model)[2]))
+  
+  predicted_x <- predict(theilsen_model, newdata = data.frame(y = n))
+  predicted_x2 <- predict(theilsen_model_no_mb, newdata = data.frame(y = n))
+  score1 <- abs(f[1]-predicted_x[1])^2+abs(f[length(predicted_x)]-predicted_x[length(predicted_x)])^2
+  score2 <- abs(f[1]-predicted_x2[1])^2+abs(f[length(predicted_x)]-predicted_x2[length(predicted_x)])^2
+
+  scores_mb_ts3 <- c(scores_mb_ts3, sqrt(score1/2))
+  scores_mb3 <- c(scores_mb3, sqrt(score2/2))
   
   x_min <- min(c(f, binned_x))
   x_max <- max(c(f, binned_x))
   y_min <- min(c(n, binned_y))
   y_max <- max(c(n, binned_y))
   
-  plot(f, n, type = "p", col = "blue", xlab = "Frequency", ylab = "number", main = paste(language_info$Language, "<= frequencies"), xlim = c(x_min, x_max), ylim = c(y_min, y_max), cex=0.75)
-  points(binned_x, binned_y, type = "b", col = "green", cex=0.75)
-  abline(theilsen_model,col='red')
-  abline(theilsen_model_no_mb,col='purple')
-  legend("topright", legend = c("Original", "mb", "Theil-sen", "Theil-sen + mb"), col = c("blue", "green", "purple", "red"), pch = 1)
-  
+  if (code %in% chart_languages) {
+    for (i in 1:length(f)) {
+      charts_data3 <- rbind(charts_data3, data.frame(x = f[i], y = n[i], Token = data$Token[i], Language = language_info$Language))
+    }
+    
+    predicted_y <- c(floor(min(n)):ceiling(max(n)))
+    predicted_x <- predict(theilsen_model, newdata = data.frame(y = predicted_y))
+    for (i in 1:length(predicted_y)) {
+      charts_predicted_data3 <- rbind(charts_predicted_data3, data.frame(x = predicted_x[i], y = predicted_y[i], Language = language_info$Language))
+    }
+    
+    plot(f, n, type = "p", col = "blue", xlab = "Frequency", ylab = "number", main = paste(language_info$Language, "<= frequencies"), xlim = c(x_min, x_max), ylim = c(y_min, y_max), cex=0.75)
+    points(binned_x, binned_y, type = "b", col = "green", cex=0.75)
+    abline(theilsen_model,col='red')
+    abline(theilsen_model_no_mb,col='purple')
+    legend("topright", legend = c("Original", "mb", "Theil-sen", "Theil-sen + mb"), col = c("blue", "green", "purple", "red"), pch = 1)
+  }
 
-
-
-# p <- ggplot(merged_files, aes(x = Length, y = Frequency, label = Token)) +
-#   geom_point() +
-#   geom_text_repel() +
-#   facet_wrap( ~ Language, ncol=3, nrow=3)
+  beta_t <- c(beta_t, 1/alpha + 1)
+  beta_p_t <- c(beta_p_t, 1/alpha)
 }
+
+p <- ggplot() +
+  geom_point(data = charts_data, aes(x = x, y = y)) +
+  geom_line(data = charts_predicted_data, aes(x = x, y = y), color = "gray", linetype = "dashed") +
+  facet_wrap( ~ Language, ncol=3, nrow=2)
+
+print(p)
+
+p <- ggplot() +
+  geom_point(data = charts_data2, aes(x = x, y = y)) +
+  geom_line(data = charts_predicted_data2, aes(x = x, y = y), color = "gray", linetype = "dashed") +
+  facet_wrap( ~ Language, ncol=3, nrow=2)
+
+print(p)
+
+p <- ggplot() +
+  geom_point(data = charts_data3, aes(x = x, y = y)) +
+  geom_line(data = charts_predicted_data3, aes(x = x, y = y), color = "gray", linetype = "dashed") +
+  facet_wrap( ~ Language, ncol=3, nrow=2)
+
+print(p)
 
 cat("Language,Family,Tokens,Types,α,β,β′\n")
 for (i in seq_along(language)) {
@@ -235,6 +328,45 @@ for (i in seq_along(language)) {
            format(alpha[i], scientific = FALSE, digits = 4),
            format(beta[i], scientific = FALSE, digits = 4),
            format(beta_p[i], scientific = FALSE, digits = 4))
+  cat(paste(row, collapse = ","),"\n")
+}
+cat("\n\n")
+
+cat("Language,α,β,theoretical β,β′,theoretical β′\n")
+for (i in seq_along(language)) {
+  row <- c(language[i],
+           format(alpha[i], scientific = FALSE, digits = 4),
+           format(beta[i], scientific = FALSE, digits = 4),
+           format(beta_t[i], scientific = FALSE, digits = 4),
+           format(beta_p[i], scientific = FALSE, digits = 4),
+           format(beta_p_t[i], scientific = FALSE, digits = 4))
+  cat(paste(row, collapse = ","),"\n")
+}
+cat("\n\n")
+
+cat("Language,score mb+ts,score ts\n")
+for (i in seq_along(language)) {
+  row <- c(language[i],
+           format(scores_mb_ts[i], scientific = FALSE, digits = 4),
+           format(scores_mb[i], scientific = FALSE, digits = 4))
+  cat(paste(row, collapse = ","),"\n")
+}
+cat("\n\n")
+
+cat("Language,score mb+ts,score ts\n")
+for (i in seq_along(language)) {
+  row <- c(language[i],
+           format(scores_mb_ts2[i], scientific = FALSE, digits = 4),
+           format(scores_mb2[i], scientific = FALSE, digits = 4))
+  cat(paste(row, collapse = ","),"\n")
+}
+cat("\n\n")
+
+cat("Language,score mb+ts,score ts\n")
+for (i in seq_along(language)) {
+  row <- c(language[i],
+           format(scores_mb_ts3[i], scientific = FALSE, digits = 4),
+           format(scores_mb3[i], scientific = FALSE, digits = 4))
   cat(paste(row, collapse = ","),"\n")
 }
 cat("\n")
