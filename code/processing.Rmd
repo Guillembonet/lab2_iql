@@ -29,6 +29,8 @@ beta_t <- c()
 beta_p <- c()
 beta_p_t <- c()
 
+word_labels <- c()
+
 scores_mb_ts <- c()
 scores_mb <- c()
 scores_mb_ts2 <- c()
@@ -294,6 +296,9 @@ for (file in csv_files) {
   
   # Prepare data for facet chart + show single chart
   if (code %in% chart_languages) {
+    three_most_frequent <- data$Token[1:5]
+    word_labels <- c(word_labels, three_most_frequent)
+      
     for (i in 1:length(f)) {
       charts_data3 <- rbind(charts_data3, data.frame(x = f[i], y = n[i], Token = data$Token[i], Language = language_info$Language))
     }
@@ -315,10 +320,15 @@ for (file in csv_files) {
   beta_p_t <- c(beta_p_t, 1/alpha)
 }
 
+charts_data_unique <- charts_data[!duplicated(charts_data$Token), ]
+
 # 6 figure plots
 p <- ggplot() +
   geom_point(data = charts_data, aes(x = x, y = y)) +
   geom_line(data = charts_predicted_data, aes(x = x, y = y), color = "gray", linetype = "dashed") +
+  geom_text_repel(data = subset(charts_data_unique, Token %in% word_labels),
+                 aes(x = x, y = y, label = Token), 
+                 box.padding = unit(0.2, "lines")) +
   facet_wrap( ~ Language, ncol=3, nrow=2)
 
 print(p)
@@ -326,6 +336,9 @@ print(p)
 p <- ggplot() +
   geom_point(data = charts_data2, aes(x = x, y = y)) +
   geom_line(data = charts_predicted_data2, aes(x = x, y = y), color = "gray", linetype = "dashed") +
+  geom_text_repel(data = subset(charts_data_unique, Token %in% word_labels),
+                 aes(x = x, y = y, label = Token), 
+                 box.padding = unit(0.2, "lines")) +
   facet_wrap( ~ Language, ncol=3, nrow=2)
 
 print(p)
@@ -333,6 +346,9 @@ print(p)
 p <- ggplot() +
   geom_point(data = charts_data3, aes(x = x, y = y)) +
   geom_line(data = charts_predicted_data3, aes(x = x, y = y), color = "gray", linetype = "dashed") +
+  geom_text_repel(data = subset(charts_data_unique, Token %in% word_labels),
+                 aes(x = x, y = y, label = Token), 
+                 box.padding = unit(0.2, "lines")) +
   facet_wrap( ~ Language, ncol=3, nrow=2)
 
 print(p)
