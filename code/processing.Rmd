@@ -65,6 +65,23 @@ for (file in csv_files) {
     x <- c(x, rep(i, data$Frequency[i]))
   }
   
+  # extracting spread x<->y values to calculate score
+  frequency <- data$Frequency
+  rank <- seq_len(nrow(data))
+  y_score <- c(frequency[1])
+  x_score <- c(rank[1])
+  last_y <- frequency[1]
+  space <- min(frequency)+max(frequency)/5
+  for (i in 1:length(frequency)) {
+    if (last_y>=frequency[i]+space) {
+      y_score <- c(y_score, frequency[i])
+      x_score <- c(x_score, rank[i])
+      last_y <- frequency[i]
+    }
+  }
+  y_score <- log(y_score)
+  x_score <- log(x_score)
+  
   # Multiplicative binning
   b <- 1.5
   
@@ -104,12 +121,16 @@ for (file in csv_files) {
   theilsen_model_no_mb <- theil_sen_regression(rank ~ frequency)
   
   # Calculate score
-  predicted_x <- predict(theilsen_model, newdata = data.frame(y = frequency))
-  predicted_x2 <- predict(theilsen_model_no_mb, newdata = data.frame(y = frequency))
-  score1 <- abs(rank[1]-predicted_x[1])^2+abs(rank[length(predicted_x)]-predicted_x[length(predicted_x)])^2
-  score2 <- abs(rank[1]-predicted_x2[1])^2+abs(rank[length(predicted_x)]-predicted_x2[length(predicted_x)])^2
-  scores_mb_ts <- c(scores_mb_ts, sqrt(score1/2))
-  scores_mb <- c(scores_mb, sqrt(score2/2))
+  predicted_x <- predict(theilsen_model, newdata = data.frame(y = y_score))
+  predicted_x2 <- predict(theilsen_model_no_mb, newdata = data.frame(frequency = y_score))
+  score1 <- 0
+  score2 <- 0
+  for (i in 1:length(x_score)) {
+    score1 <- score1+abs(x_score[i]-predicted_x[i])^2
+    score2 <- score2+abs(x_score[i]-predicted_x2[i])^2
+  }
+  scores_mb_ts <- c(scores_mb_ts, sqrt(score1/length(x_score)))
+  scores_mb <- c(scores_mb, sqrt(score2/length(x_score)))
 
   # Prepare data for facet chart + show single chart
   if (code %in% chart_languages) {
@@ -152,6 +173,22 @@ for (file in csv_files) {
   
   n <- c(n, last_n)
   f <- c(f, last_f)
+  
+  # extracting spread x<->y values to calculate score
+  y_score <- c(n[1])
+  x_score <- c(f[1])
+  last_y <- n[1]
+  space <- min(n)+max(n)/5
+  for (i in 1:length(n)) {
+    if (last_y>=n[i]+space) {
+      y_score <- c(y_score, n[i])
+      x_score <- c(x_score, f[i])
+      last_y <- n[i]
+    }
+  }
+  y_score <- log(y_score)
+  x_score <- log(x_score)
+  
   n <- log(n)
   f <- log(f)
   
@@ -191,13 +228,16 @@ for (file in csv_files) {
   beta <- c(beta, unname(coef(theilsen_model)[2]))
 
   # Calculate score
-  predicted_x <- predict(theilsen_model, newdata = data.frame(y = n))
-  predicted_x2 <- predict(theilsen_model_no_mb, newdata = data.frame(y = n))
-  score1 <- abs(f[1]-predicted_x[1])^2+abs(f[length(predicted_x)]-predicted_x[length(predicted_x)])^2
-  score2 <- abs(f[1]-predicted_x2[1])^2+abs(f[length(predicted_x)]-predicted_x2[length(predicted_x)])^2
-
-  scores_mb_ts2 <- c(scores_mb_ts2, sqrt(score1/2))
-  scores_mb2 <- c(scores_mb2, sqrt(score2/2))
+  predicted_x <- predict(theilsen_model, newdata = data.frame(y = y_score))
+  predicted_x2 <- predict(theilsen_model_no_mb, newdata = data.frame(n = y_score))
+  score1 <- 0
+  score2 <- 0
+  for (i in 1:length(x_score)) {
+    score1 <- score1+abs(x_score[i]-predicted_x[i])^2
+    score2 <- score2+abs(x_score[i]-predicted_x2[i])^2
+  }
+  scores_mb_ts2 <- c(scores_mb_ts2, sqrt(score1/length(x_score)))
+  scores_mb2 <- c(scores_mb2, sqrt(score2/length(x_score)))
   
   # Prepare data for facet chart + show single chart
   if (code %in% chart_languages) {
@@ -247,6 +287,22 @@ for (file in csv_files) {
   
   n <- c(n, last_n)
   f <- c(f, last_f)
+  
+  # extracting spread x<->y values to calculate score
+  y_score <- c(n[1])
+  x_score <- c(f[1])
+  last_y <- n[1]
+  space <- min(n)+max(n)/5
+  for (i in 1:length(n)) {
+    if (last_y>=n[i]+space) {
+      y_score <- c(y_score, n[i])
+      x_score <- c(x_score, f[i])
+      last_y <- n[i]
+    }
+  }
+  y_score <- log(y_score)
+  x_score <- log(x_score)
+  
   n <- log(n)
   f <- log(f)
   
@@ -281,13 +337,16 @@ for (file in csv_files) {
   beta_p <- c(beta_p, unname(coef(theilsen_model)[2]))
   
   # Calculate score
-  predicted_x <- predict(theilsen_model, newdata = data.frame(y = n))
-  predicted_x2 <- predict(theilsen_model_no_mb, newdata = data.frame(y = n))
-  score1 <- abs(f[1]-predicted_x[1])^2+abs(f[length(predicted_x)]-predicted_x[length(predicted_x)])^2
-  score2 <- abs(f[1]-predicted_x2[1])^2+abs(f[length(predicted_x)]-predicted_x2[length(predicted_x)])^2
-
-  scores_mb_ts3 <- c(scores_mb_ts3, sqrt(score1/2))
-  scores_mb3 <- c(scores_mb3, sqrt(score2/2))
+  predicted_x <- predict(theilsen_model, newdata = data.frame(y = y_score))
+  predicted_x2 <- predict(theilsen_model_no_mb, newdata = data.frame(n = y_score))
+  score1 <- 0
+  score2 <- 0
+  for (i in 1:length(x_score)) {
+    score1 <- score1+abs(x_score[i]-predicted_x[i])^2
+    score2 <- score2+abs(x_score[i]-predicted_x2[i])^2
+  }
+  scores_mb_ts3 <- c(scores_mb_ts3, sqrt(score1/length(x_score)))
+  scores_mb3 <- c(scores_mb3, sqrt(score2/length(x_score)))
   
   x_min <- min(c(f, binned_x))
   x_max <- max(c(f, binned_x))
