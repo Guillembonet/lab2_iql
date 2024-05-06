@@ -384,6 +384,7 @@ charts_data_unique <- charts_data[!duplicated(charts_data$Token), ]
 # 6 figure plots
 p <- ggplot() +
   geom_point(data = charts_data, aes(x = x, y = y)) +
+  xlab("Rank") + ylab("Frequency") +
   geom_line(data = charts_predicted_data, aes(x = x, y = y), color = "gray", linetype = "dashed") +
   geom_text_repel(data = subset(charts_data_unique, Token %in% word_labels),
                  aes(x = x, y = y, label = Token), 
@@ -394,20 +395,16 @@ print(p)
 
 p <- ggplot() +
   geom_point(data = charts_data2, aes(x = x, y = y)) +
+  xlab("Frequency") + ylab("n") +
   geom_line(data = charts_predicted_data2, aes(x = x, y = y), color = "gray", linetype = "dashed") +
-  geom_text_repel(data = subset(charts_data_unique, Token %in% word_labels),
-                 aes(x = x, y = y, label = Token), 
-                 box.padding = unit(0.2, "lines")) +
   facet_wrap( ~ Language, ncol=3, nrow=2)
 
 print(p)
 
 p <- ggplot() +
   geom_point(data = charts_data3, aes(x = x, y = y)) +
+  xlab("Frequency") + ylab("n >=") +
   geom_line(data = charts_predicted_data3, aes(x = x, y = y), color = "gray", linetype = "dashed") +
-  geom_text_repel(data = subset(charts_data_unique, Token %in% word_labels),
-                 aes(x = x, y = y, label = Token), 
-                 box.padding = unit(0.2, "lines")) +
   facet_wrap( ~ Language, ncol=3, nrow=2)
 
 print(p)
